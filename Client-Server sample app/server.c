@@ -385,7 +385,7 @@ int main()
 
           if (strstr(curr_response, "add-user : ") != NULL)
           {
-            strcpy(new_username, strstr(curr_response, ":") - 1);
+            strcpy(new_username, strstr(curr_response, ":") +1);
             printf("[DEBUG]: the new username is %s\n", new_username);
           }
 
@@ -394,7 +394,7 @@ int main()
             strcpy(new_username, curr_response + 3);
             printf("[DEBUG]: the new username is %s\n", new_username);
           }
-          fwrite(new_username, 0, strlen(new_username), fp);
+          fwrite(new_username, 1, strlen(new_username), fp);
           fclose(fp);
           write(add_pipe[write_end], "User succesfully added ! \n", strlen("User succesfully added ! \n"));
           exit(0);
