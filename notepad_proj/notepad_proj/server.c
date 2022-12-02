@@ -12,12 +12,16 @@
 #include <sys/select.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <dirent.h>
 #define port 6969
 
 #define file_folder "files"
 #define MAX_FILE_PEERS 2
 #define MAX_FILES_NO 10
 #define MAX_CLIENTS 5
+
+uint16_t file_struct_indx = 0;
+uint16_t clients_indx = 0;
 
 /// @brief Decode a raw message prefixated with type of message and length
 /// @param raw_msg
@@ -53,11 +57,37 @@ int decode_messaje(char *raw_msg)
     return length_int;
 }
 
+// add to the file_table every file  in files folder
+void add_files_from_folder()
+{
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(".");
+    if (d)
+    {
+        while ((dir = readdir(d)) != NULL)
+        {
+            // printf("%s\n", dir->d_name);
+
+            if (strstr(dir->d_name, ".txt") != NULL)
+            {
+
+                // add it to the list
+                struct file_stat curr_file;
+                curr_file.file_name = dir->d_name;
+                curr_file.peers_conn = 0;
+                file_table[file_struct_indx++] = curr_file;
+
+            }
+        }
+        closedir(d);
+    }
+}
+
 #define compare_it(STR1, STR2, STR3) if (strstr(STR1, STR2) != NULL || strstr(STR1, STR3) != NULL)
 int main()
 {
-    uint16_t file_struct_indx = 0;
-    uint16_t clients_indx = 0;
+
     // create the socket
     struct sockaddr_in server;
     struct sockaddr_in client;
@@ -67,6 +97,12 @@ int main()
     int optval = 1;
     fd_set all_fds;
     fd_set readfds;
+
+
+        //add the files from the folder 
+    chdir(file_folder);
+    add_files_from_folder();
+    chdir("..");
 
     int sd; // socket descriptor
 
@@ -147,7 +183,6 @@ int main()
 
                 // /printf("curr fd is %d\n",curr_fd);
 
-
                 // add curent client to table
                 struct client curr_client;
 
@@ -204,7 +239,6 @@ int main()
                         // printf("the dir is %s\n",getcwd(msg,100));
                         FILE *fp;
                         // open the file in append mode
-                        fp = fopen(file_name, "w");
                         if (access(file_name, F_OK) == 0)
                         {
                             // file already exists
@@ -214,6 +248,7 @@ int main()
                         {
                             printf("Succesfully created file: %s\n", file_name);
                         }
+                        fp = fopen(file_name, "w");
 
                         // add file to file_stat struct
 
@@ -234,20 +269,20 @@ int main()
                     {
                         struct client curr_client;
 
-                        //get the client which issued the command 
+                        // get the client which issued the command
 
-                        for (int i = 0 ;i<clients_indx;i++)
+                        for (int i = 0; i < clients_indx; i++)
                         {
                             if (clients_table[i].client_id == curr_fd)
                             {
-                                clients_table[i].isWriting = true; //mark him as connected to a file 
+                                clients_table[i].isWriting = true; // mark him as connected to a file
                                 curr_client = clients_table[i];
                                 break;
                             }
                         }
 
                         // client wants to open file
-                        char *file_name;
+                        char file_name[32];
                         if (strstr(msg, "-o") != NULL)
                             strcpy(file_name, msg + 3);
 
@@ -255,7 +290,7 @@ int main()
                             strcpy(file_name, msg + 5);
 
                         strcat(file_name, ".txt");
-
+                        printf("clien wants to open %s\n",file_name);
                         chdir(file_folder);
 
                         // mark the client as busy and file as opened by one
@@ -280,22 +315,33 @@ int main()
                                     if (file_table[i].peers_conn == 1)
                                         file_table[i].peers[1] = curr_client;
 
-                                    else file_table[i].peers[0] = curr_client;
+                                    else
+                                        file_table[i].peers[0] = curr_client;
                                 }
-
-                            
-
                             }
                         }
-                        //just open the file in append mode 
-                        FILE*fp ;
-                    fp = fopen(file_name,"a");
-                    
-                    //wait for user input 
+                        // just open the file in append mode
+                        FILE *fp;
+                        fp = fopen(file_name, "a");
 
-
-
+                        // wait for user input
                     }
+
+                    else compare_it(msg, "list-files", "ls")
+                    {
+                        // list all the names in the file_table
+                        //printf("deteceted\n");
+                        //char mess[1000]; 
+                        for (int i = 0; i < file_struct_indx; i++)
+                        {
+
+                            printf("%s\n", file_table[i].file_name);
+                            
+                        }
+                    }
+
+                    // loop through client and see if he is connected to a file and append the text to it
+                    // if curr_fd ==  curr_client from list then append to the file opened by him
 
                     write(pipe_ends[1], "[child-finished]", strlen("[child-finished]"));
                     fflush(stdout);
