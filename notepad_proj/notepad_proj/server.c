@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <dirent.h>
+#include<time.h>
 #define port 6969
 
 #define file_folder "files"
@@ -245,7 +246,7 @@ int main()
                             printf("File with the name %s' already exists... \n", file_name);
                         }
                         else
-                        {
+                        {   
                             printf("Succesfully created file: %s\n", file_name);
                         }
                         fp = fopen(file_name, "w");
@@ -257,8 +258,17 @@ int main()
                         curr_stat.peers_conn = 0;
 
                         file_table[file_struct_indx++] = curr_stat;
+                        time_t t;
+                        time(&t);
 
-                        fwrite("File just created \n", 1, strlen("File just created\n"), fp);
+                        fwrite("###File just created at ", 1, strlen("###File just created at "), fp);
+                        fwrite(ctime(&t),1,strlen(ctime(&t))-1,fp);
+                        fwrite(" by user ", 1, strlen(" by user "), fp);
+                        char  user_fd [10];
+                        sprintf(user_fd,"%d",curr_fd);
+                        strcat(user_fd,"###");
+                        fwrite(user_fd,1,strlen(user_fd),fp);
+
                         fclose(fp);
 
                         // go back to the parent dir
@@ -332,18 +342,30 @@ int main()
                         // list all the names in the file_table
                         //printf("deteceted\n");
                         //char mess[1000]; 
+                        char response[256];
+                        bzero(response,256);
                         for (int i = 0; i < file_struct_indx; i++)
                         {
-
-                            printf("%s\n", file_table[i].file_name);
+                            printf("%s\n",file_table[i].file_name);
+                            strncat(response,file_table[i].file_name,strlen(file_table[i].file_name));
+                            strcat(response,"\n");
                             
                         }
+                            printf(" the respons is %s\n", response);
+                            //write(curr_fd,response,strlen(response));
+                            write(pipe_ends[1], response, strlen(response));
+                            
+                    }
+
+
+                    else compare_it(msg,"exit","/exit")
+                    {
+                        write(pipe_ends[1],"exit",strlen("exit"));
                     }
 
                     // loop through client and see if he is connected to a file and append the text to it
                     // if curr_fd ==  curr_client from list then append to the file opened by him
 
-                    write(pipe_ends[1], "[child-finished]", strlen("[child-finished]"));
                     fflush(stdout);
                     exit(0); // the process has finished
                 }
@@ -358,6 +380,7 @@ int main()
                     char msj[100];
                     bzero(msj, sizeof(msj));
                     read(pipe_ends[0], msj, 100);
+
                     if (strstr(msj, "exit") != NULL)
                     {
 

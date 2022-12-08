@@ -80,18 +80,34 @@ int main()
   
     sprintf(length,"%d",read_length_stdin-1);
     strcat(sentmsg,length);
-    printf("the message is %s\n",sentmsg);
+    //printf("the message is %s\n",sentmsg);
     strcat(sentmsg,"$");   
     printf("the message is %s\n",sentmsg);
     strcat(sentmsg,msg);
-    printf("the message is %s\n",sentmsg);
+    //printf("the message is %s\n",sentmsg);
 
         if (write(sd, sentmsg, read_length_stdin+strlen(length)) == -1)
         {
             perror("write() error");
             exit(-1);
         }
-        printf("message sent\n");
+        printf("[DEBUG] message sent\n");
+
+        char read_srv[200];
+
+        if(read(sd,read_srv,200)== -1)
+        {
+            perror("read msg");
+
+        }
+
+        else 
+        {
+
+            printf("[SERVER] %s\n",read_srv);
+
+        }
+
     }
     close(sd);
 }
