@@ -20,6 +20,43 @@ int signal_callback_handler(int signum) {
    exit(1); // inttreupt
     
 }
+
+int decode_messaje(char *raw_msg)
+{
+
+    // ex: 5$texta
+    char length[8];
+    strncpy(length, raw_msg, strchr(raw_msg, '$') - raw_msg);
+    int length_int = atoi(length);
+
+    strcpy(raw_msg, strchr(raw_msg, '$') + 1);
+    //printf("%s,%d\n", raw_msg, length_int);
+    return length_int;
+}
+
+
+ void encode_message(char *msg,char encoded[])
+{
+
+//printf("%s\n",msg);
+char  encoded_msg[256];
+
+
+char length[9];
+bzero(length,9);
+
+
+
+ sprintf(length,"%d",strlen(msg)-1); //get the len of the message 
+//printf("%s\n",length);
+ //strcpy(encoded,length);
+ strcat(encoded,length); //append it to encoded msg
+ strcat(encoded,"$");   //append  $ 
+ strcat(encoded,msg); //append the message 
+return;
+
+}
+
 int main()
 {
 
@@ -55,37 +92,30 @@ int main()
         
        signal(SIGINT,signal_callback_handler);
         
-        // if (signal(SIGINT,signal_callback_handler))
-        // {
-        //     write(sd,"exit",strlen("exit"));
-        //     printf("messahe sent");
-        //     close(sd);
-        //     exit(1);//interrupt
-        // }  
-     
-       // fscanf(stdin,"%s",msg); //read a message from the user
-    int read_length_stdin = read(0,msg,100);
-    msg[read_length_stdin]=NULL;
+       
+    int read_length_stdin = read(0,msg,256);
+
+
+    if(read_length_stdin < 0 )
+    {
+        perror("read error");
+
+    }
+    //msg[read_length_stdin]=NULL;
     
     char sentmsg[1000]; // the message that will pe sent according to the protocol 
     bzero(sentmsg,100);
 
-    char length[10];
-    bzero(length,10);
+    encode_message(msg,sentmsg);
+    
+    char length[8];
+    bzero(length,8);
 
-    //printf("the len is %s\n",strlen(length));
-
-    //the message first n bits until $ char will be used to get messaje length
-    //10$ --> a message of length 10
+   
   
-    sprintf(length,"%d",read_length_stdin-1);
-    strcat(sentmsg,length);
-    //printf("the message is %s\n",sentmsg);
-    strcat(sentmsg,"$");   
-    printf("the message is %s\n",sentmsg);
-    strcat(sentmsg,msg);
-    //printf("the message is %s\n",sentmsg);
-
+    sprintf(length,"%d",read_length_stdin);
+    
+    
         if (write(sd, sentmsg, read_length_stdin+strlen(length)) == -1)
         {
             perror("write() error");
@@ -94,16 +124,36 @@ int main()
         printf("[DEBUG] message sent\n");
 
         char read_srv[200];
+        bzero(read_srv,200);
+        size_t read_len = read(sd,read_srv,200);
+        read_srv[read_len]=NULL;
 
-        if(read(sd,read_srv,200)== -1)
+        
+        if( read_len== -1)
         {
             perror("read msg");
 
         }
 
+        //decode the message from the server 
+
+       
+
+        int msg_len_sv = decode_messaje(&read_srv);
+
+        
+        //printf(" msg  after decode is %s\n",read_srv);
+        //printf(" msg  len after decode is %d\n",strlen(read_srv));
+
+        if(msg_len_sv +1 != strlen(read_srv))
+        {
+            perror("read not complete");
+        }
+
+        
+
         else 
         {
-
             printf("[SERVER] %s\n",read_srv);
 
         }

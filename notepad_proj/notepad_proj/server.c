@@ -13,13 +13,17 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <dirent.h>
-#include<time.h>
+#include <time.h>
 #define port 6969
 
 #define file_folder "files"
 #define MAX_FILE_PEERS 2
 #define MAX_FILES_NO 10
 #define MAX_CLIENTS 5
+
+#define READ_END 0
+#define WRITE_END 1
+#define compare_it(STR1, STR2, STR3) if (strstr(STR1, STR2) != NULL || strstr(STR1, STR3) != NULL)
 
 uint16_t file_struct_indx = 0;
 uint16_t clients_indx = 0;
@@ -37,7 +41,6 @@ struct client
 /// @brief stats for every file created
 struct file_stat
 {
-
     char *file_name; // the name of the file
     struct client peers[MAX_FILE_PEERS];
     uint32_t peers_conn;
@@ -54,7 +57,8 @@ int decode_messaje(char *raw_msg)
     int length_int = atoi(length);
 
     strcpy(raw_msg, strchr(raw_msg, '$') + 1);
-    printf("%s,%d\n", raw_msg, length_int);
+    raw_msg[strlen(raw_msg)] = NULL;
+    // printf("%s,%d\n", raw_msg, length_int);
     return length_int;
 }
 
@@ -76,16 +80,35 @@ void add_files_from_folder()
                 // add it to the list
                 struct file_stat curr_file;
                 curr_file.file_name = dir->d_name;
+                // curr_file.file_name[strlen(dir->d_name)]=NULL;
                 curr_file.peers_conn = 0;
                 file_table[file_struct_indx++] = curr_file;
-
             }
         }
         closedir(d);
     }
 }
 
-#define compare_it(STR1, STR2, STR3) if (strstr(STR1, STR2) != NULL || strstr(STR1, STR3) != NULL)
+void encode_message(char *msg, char encoded[])
+{
+
+    // printf("%s\n",msg);
+    char encoded_msg[256];
+
+    char length[9];
+    bzero(length, 9);
+
+    sprintf(length, "%d", strlen(msg) - 1); // get the len of the message
+    // printf("%s\n",length);
+    // strcpy(encoded,length);
+    strcat(encoded, length); // append it to encoded msg
+    strcat(encoded, "$");    // append  $
+    strcat(encoded, msg);    // append the message
+
+    encoded_msg[strlen(encoded_msg)] = NULL;
+    return;
+}
+
 int main()
 {
 
@@ -93,14 +116,13 @@ int main()
     struct sockaddr_in server;
     struct sockaddr_in client;
     struct timeval tv;
-    char msg[100];
+
     char msgres[100];
     int optval = 1;
     fd_set all_fds;
     fd_set readfds;
 
-
-        //add the files from the folder 
+    // add the files from the folder
     chdir(file_folder);
     add_files_from_folder();
     chdir("..");
@@ -202,8 +224,13 @@ int main()
                 {
                     // child
                     close(pipe_ends[0]); // close for read
-                    bzero(msg, 100);
-                    size_t read_len = read(curr_fd, msg, 100);
+                    char msg[256];
+
+                    bzero(msg, 256);
+
+                    // read in child
+                    size_t read_len = read(curr_fd, msg, 256);
+
                     if (read_len < 0)
                     {
                         perror("(read) error");
@@ -211,6 +238,7 @@ int main()
 
                     int msg_len = decode_messaje(&msg);
 
+                    printf("msg after decode is %s\n", msg);
                     if (msg_len == read_len) // TODO check for next packets if the message is in them !!!
                     {
                         perror("(read) messaged not read completly");
@@ -223,6 +251,7 @@ int main()
 
                         // get the file name
                         char file_name[128];
+
                         bzero(file_name, 128);
 
                         if (strstr(msg, "crf") != NULL)
@@ -243,11 +272,23 @@ int main()
                         if (access(file_name, F_OK) == 0)
                         {
                             // file already exists
-                            printf("File with the name %s' already exists... \n", file_name);
+                            char message[50];
+                            bzero(message, 50);
+                            strcat(message, "File with the name ");
+                            strcat(message, file_name);
+                            strcat(message, " already exists ...\n");
+                            printf("[DEBUG] File with the name %s  already exists... \n", file_name);
+                            write(pipe_ends[WRITE_END], message, strlen(message));
                         }
                         else
-                        {   
-                            printf("Succesfully created file: %s\n", file_name);
+                        {
+                            char message[50];
+                            bzero(message, 50);
+                            strcat(message, "File with the name ");
+                            strcat(message, file_name);
+                            strcat(message, " created succesfully ...\n");
+                            // printf("[DEBUG] File with the name %s  already exists... \n", file_name);
+                            write(pipe_ends[WRITE_END], message, strlen(message));
                         }
                         fp = fopen(file_name, "w");
 
@@ -261,13 +302,18 @@ int main()
                         time_t t;
                         time(&t);
 
+                        // for(int i = 0 ; i < file_struct_indx ; i++)
+                        // {
+                        //     printf("the name is %s\n",file_table[i].file_name);
+                        // }
+
                         fwrite("###File just created at ", 1, strlen("###File just created at "), fp);
-                        fwrite(ctime(&t),1,strlen(ctime(&t))-1,fp);
+                        fwrite(ctime(&t), 1, strlen(ctime(&t)) - 1, fp);
                         fwrite(" by user ", 1, strlen(" by user "), fp);
-                        char  user_fd [10];
-                        sprintf(user_fd,"%d",curr_fd);
-                        strcat(user_fd,"###");
-                        fwrite(user_fd,1,strlen(user_fd),fp);
+                        char user_fd[10];
+                        sprintf(user_fd, "%d", curr_fd);
+                        strcat(user_fd, "###");
+                        fwrite(user_fd, 1, strlen(user_fd), fp);
 
                         fclose(fp);
 
@@ -275,7 +321,7 @@ int main()
                         chdir("..");
                     }
 
-                    else compare_it(msg, "-o", "open")
+                    else compare_it(msg, "edit", "open")
                     {
                         struct client curr_client;
 
@@ -300,7 +346,7 @@ int main()
                             strcpy(file_name, msg + 5);
 
                         strcat(file_name, ".txt");
-                        printf("clien wants to open %s\n",file_name);
+                        printf("clien wants to open %s\n", file_name);
                         chdir(file_folder);
 
                         // mark the client as busy and file as opened by one
@@ -313,6 +359,7 @@ int main()
                             {
 
                                 // mark in the table
+                                // TODO if the file is not present
 
                                 if (file_table[i].peers_conn >= 2)
                                 {
@@ -332,35 +379,71 @@ int main()
                         }
                         // just open the file in append mode
                         FILE *fp;
-                        fp = fopen(file_name, "a");
+                        fp = fopen(file_name, "ra");
 
+                        // sent the content of the file to user
+
+                        char file_content[1024];
+
+                        fseek(fp, 0, SEEK_END); //get the size of the file 
+                         long file_size = ftell(fp);
+                        rewind(fp);
+
+                        fread(file_content, file_size, 1, fp);
+
+                        printf("the content is %s\n", file_content);
+
+                        //fwrite(file_content, 1, strlen(file_content), fp);
+                        fclose(fp);
+
+                        write(pipe_ends[WRITE_END],file_content,strlen(file_content));
+                        // /write(curr_fd, file_content, strlen(file_content));
+                        exit(0);
                         // wait for user input
                     }
 
                     else compare_it(msg, "list-files", "ls")
                     {
                         // list all the names in the file_table
-                        //printf("deteceted\n");
-                        //char mess[1000]; 
+
                         char response[256];
-                        bzero(response,256);
-                        for (int i = 0; i < file_struct_indx; i++)
+                        bzero(response, 256);
+
+                        // for (int i = 0; i < file_struct_indx; i++)
+                        // {
+                        //     printf(" name is %s \n", file_table[i].file_name);
+                        //     // printf("the len of name is %d\n",strlen(file_table[i].file_name));
+                        //     strncat(response, file_table[i].file_name, strlen(file_table[i].file_name));
+                        //     strcat(response, "\n");
+                        // }
+
+                        DIR *d;
+                        struct dirent *dir;
+                        chdir(file_folder);
+                        d = opendir(".");
+                        if (d)
                         {
-                            printf("%s\n",file_table[i].file_name);
-                            strncat(response,file_table[i].file_name,strlen(file_table[i].file_name));
-                            strcat(response,"\n");
-                            
+                            while ((dir = readdir(d)) != NULL)
+                            {
+                                // printf("%s\n", dir->d_name);
+
+                                if (strstr(dir->d_name, ".txt") != NULL)
+                                {
+                                    printf("name is %s\n", dir->d_name);
+                                    strncat(response, dir->d_name, strlen(dir->d_name));
+                                    strcat(response, "\n");
+                                    // printf(" the respons is %s\n", response);
+                                    // write(curr_fd,response,strlen(response));
+                                }
+                            }
                         }
-                            printf(" the respons is %s\n", response);
-                            //write(curr_fd,response,strlen(response));
-                            write(pipe_ends[1], response, strlen(response));
-                            
+                        write(pipe_ends[1], response, strlen(response));
                     }
-
-
-                    else compare_it(msg,"exit","/exit")
+                    else compare_it(msg, "exit", "/exit")
                     {
-                        write(pipe_ends[1],"exit",strlen("exit"));
+
+                        
+                        write(pipe_ends[1], "exit", strlen("exit"));
                     }
 
                     // loop through client and see if he is connected to a file and append the text to it
@@ -376,11 +459,22 @@ int main()
 
                     // wait for child to finish
                     wait(NULL);
+
                     close(pipe_ends[1]);
                     char msj[100];
-                    bzero(msj, sizeof(msj));
-                    read(pipe_ends[0], msj, 100);
 
+                    bzero(msj, sizeof(msj));
+
+                    // read the output from child
+                    size_t read_len = read(pipe_ends[0], msj, 100);
+                    // printf("read %d from child \n",read_len);
+                    if (read_len < 0)
+                    {
+                        perror("(read error) from child");
+                    }
+
+                    char encoded_msg[256];
+                    bzero(encoded_msg, 256);
                     if (strstr(msj, "exit") != NULL)
                     {
 
@@ -390,8 +484,20 @@ int main()
                         // exit(1);
                         fflush(stdout);
                     }
+                    else if (strlen(msj) == 0)
+                    {
+                        // printf("cmd not found try help \n");
+                        encode_message("cmd not found try help \n", encoded_msg);
+                        write(curr_fd, encoded_msg, strlen(encoded_msg));
+                    }
                     else
-                        printf("Client[%d]: %s\n", curr_fd, msj);
+                        // printf("Client[%d]: %s\n", curr_fd, msj);
+                        // encode the message
+                        encode_message(msj, encoded_msg);
+
+                    // printf("[DEBUG] the enc msg is %s\n",encoded_msg);
+                    //  send back to client
+                    write(curr_fd, encoded_msg, strlen(encoded_msg));
                     // close(curr_fd);
                 }
             }
