@@ -9,6 +9,9 @@
 #include <netdb.h>
 #include <string.h>
 #include<signal.h>
+//#include <gtk/gtk.h>
+
+
 int port;
 int global_sd;
 
@@ -20,6 +23,23 @@ int signal_callback_handler(int signum) {
    exit(1); // inttreupt
     
 }
+
+
+// //handler for activate 
+// static void app_activate(GApplication *app, gpointer user_data)
+// {
+//     GtkWidget *win;
+//     GtkWidget *textview;
+
+//     textview = gtk_text_view_new();
+//     win = gtk_window_new();
+
+//     gtk_window_set_child(GTK_WINDOW(win), textview);
+//     gtk_window_set_application(GTK_WINDOW(win), GTK_APPLICATION(app)); //connect to app process 
+//     gtk_window_set_title(GTK_WINDOW(win), "Text editor");
+//     gtk_window_present(GTK_WINDOW(win));
+// }
+
 
 int decode_messaje(char *raw_msg)
 {
@@ -57,8 +77,21 @@ return;
 
 }
 
-int main()
+int main(argc, argv)
 {
+
+    //  GtkApplication *app;
+    // int stat;
+
+    // // window = gtk_application_window_new(app);
+    // app = gtk_application_new("com.github.ToshioCP.pr1", G_APPLICATION_FLAGS_NONE);
+
+    // g_signal_connect(app, "activate", G_CALLBACK(app_activate), NULL); // handler for the activate signal
+
+    // // gtk_window_present(GTK_WINDOW(window));
+    // stat = g_application_run(G_APPLICATION(app), argc, argv);
+    // g_object_unref(app);
+    // return stat;
 
     int sd;                    // socket descriptor
     struct sockaddr_in server; // server address
