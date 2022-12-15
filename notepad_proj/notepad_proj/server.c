@@ -24,6 +24,10 @@
 #define READ_END 0
 #define WRITE_END 1
 
+#define SMALL_SIZE 256
+#define MEDIUM_SIZE 1024
+#define BIG_SIZE 2048
+
 // #define compare_it(STR1, STR2, STR3) if (strstr(STR1, STR2) != NULL || strstr(STR1, STR3) != NULL)
 int compare_it_funct(char *msg, char *command1, char *command2)
 {
@@ -174,11 +178,11 @@ void print_client_info(struct client *client)
 
 int respond_to_client(int curr_fd, char *msg)
 {
-    char encoded_msg[256];
-    bzero(encoded_msg, 256);
+    char encoded_msg[BIG_SIZE];
+    bzero(encoded_msg, BIG_SIZE);
 
     encode_message(msg, encoded_msg);
-    printf("encoded msg: %s\n", encoded_msg);
+    // printf("encoded msg is : %s\n", encoded_msg);
 
     // printf("encoded msg: %s\n",encoded_msg);
     if (write(curr_fd, encoded_msg, strlen(encoded_msg)) <= 0)
@@ -186,10 +190,21 @@ int respond_to_client(int curr_fd, char *msg)
         perror("write() error");
         return -1;
     }
-
+    // printf("The message is sent to the client %s\n ", msg);
     return 0;
 }
 
+struct file_stat *get_file_by_name(char *file_name)
+{
+    for (int i = 0; i < file_struct_indx; i++)
+    {
+        if (strcmp(file_table[i].file_name, file_name) == 0)
+        {
+            return &file_table[i];
+        }
+    }
+    return NULL;
+}
 int main()
 {
 
@@ -327,7 +342,7 @@ int main()
                 }
 
                 int msg_len = decode_messaje(raw_msg, msg);
-                printf("read len is %d and len of msg is %d\n", read_len, strlen(msg));
+                // printf("read len is %d and len of msg is %d\n", read_len, strlen(msg));
 
                 msg[strcspn(msg, "\n")] = NULL; // eliminate the new line character
                 printf("msg after decode is %s with length %d\n", msg, strlen(msg));
@@ -337,21 +352,28 @@ int main()
                     perror("(read) messaged not read completly");
                 }
 
+                
                 // handle the client's command to the server
                 // printf("message is %s\n", msg);
+                if(strlen(msg)==0)
+                    {
+
+                    strcat(msg,"\n");
+
+                    }
+                    
 
                 compare_it(msg, "exit", "/exit")
                 {
                     close(curr_fd);
                     printf("client wants to exit\n");
-                    break;
+
                     struct client *curr_client = get_client_by_fd(curr_fd);
                     curr_client->isWriting = false;
                     curr_client->logged_in = false;
                     curr_client->client_id = -1;
                     continue;
                 }
-
                 compare_it(msg, "login", "/l")
                 {
                     // check if he is logged in
@@ -409,7 +431,7 @@ int main()
                     continue;
                 }
 
-               // print_clients();
+                // print_clients();
                 // he can execute commands only if he is logged in
                 // printf("the message is %s\n", msg);
 
@@ -452,19 +474,25 @@ int main()
 
                         chdir(file_folder);
 
-                        // printf("the dir is %s\n",getcwd(msg,100));
+                        // printf("file name is %s\n",file_name);
                         FILE *fp;
-                        // open the file in append mode
-                        char message[50];
+                        // message to be sent to the client
+                        char message[SMALL_SIZE];
+                        bzero(message, SMALL_SIZE);
+
                         if (access(file_name, F_OK) == 0)
                         {
                             // file already exists
-                            bzero(message, 50);
+                            bzero(message, SMALL_SIZE);
                             strcat(message, "File with the name ");
                             strcat(message, file_name);
                             strcat(message, " already exists ...\n");
                             printf("[DEBUG] File with the name %s  already exists... \n", file_name);
                             // write(pipe_ends[WRITE_END], message, strlen(message));
+                            if (respond_to_client(curr_fd, message) < 0)
+                            {
+                                perror("respond to client error");
+                            }
                         }
                         else
                         { // file does not exist
@@ -478,42 +506,91 @@ int main()
 
                             add_files_entry(&curr_stat);
 
-                            print_files();
+                            // print_files();
                             char message[50];
                             bzero(message, 50);
                             strcat(message, "File with the name ");
                             strcat(message, file_name);
                             strcat(message, " created succesfully ...\n");
+
+                            if (respond_to_client(curr_fd, message) < 0)
+                            {
+                                perror("respond to client error");
+                            }
                             // printf("[DEBUG] File with the name %s  already exists... \n", file_name);
                             // write(pipe_ends[WRITE_END], message, strlen(message));
+                            time_t t;
+                            time(&t);
+
+                            fwrite("###File just created at ", 1, strlen("###File just created at "), fp);
+                            fwrite(ctime(&t), 1, strlen(ctime(&t)) - 1, fp);
+                            fwrite(" by user ", 1, strlen(" by user "), fp);
+                            char user_fd[10];
+                            sprintf(user_fd, "%d", curr_fd);
+                            strcat(user_fd, "###");
+                            fwrite(user_fd, 1, strlen(user_fd), fp);
+
+                            fclose(fp);
+
+                            // go back to the parent dir
+                            chdir("..");
                         }
 
-                        time_t t;
-                        time(&t);
+                        // printf("[DEBUG] the message is %s\n", message);
+                        //  if (respond_to_client(curr_fd, message) < 0)
+                        //  {
+                        //      perror("respond to client error");
+                        //  }
+                    }
 
-                        fwrite("###File just created at ", 1, strlen("###File just created at "), fp);
-                        fwrite(ctime(&t), 1, strlen(ctime(&t)) - 1, fp);
-                        fwrite(" by user ", 1, strlen(" by user "), fp);
-                        char user_fd[10];
-                        sprintf(user_fd, "%d", curr_fd);
-                        strcat(user_fd, "###");
-                        fwrite(user_fd, 1, strlen(user_fd), fp);
+                    else compare_it(msg, "delete", "/del")
+                    {
+                        // delete the file specified
+                        char file_name[SMALL_SIZE];
+                        bzero(file_name, SMALL_SIZE);
 
-                        fclose(fp);
-
-                        // go back to the parent dir
-                        chdir("..");
-
-                        if (respond_to_client(curr_fd, message) < 0)
+                        if (strstr(msg, "/del") != NULL)
                         {
-                            perror("respond to client error");
+                            strcat(file_name, msg + 5);
+                        }
+
+                        else
+                            strcpy(file_name, msg + strlen("delete") + 1);
+
+                        strcat(file_name, ".txt");
+
+                        chdir(file_folder);
+                        // delete the file specified
+                        if (remove(file_name) == 0)
+                        {
+                            printf("File %s deleted successfully\n", file_name);
+                            char message[SMALL_SIZE];
+                            bzero(message, SMALL_SIZE);
+                            strcat(message, "File ");
+                            strcat(message, file_name);
+                            strcat(message, " deleted successfully\n");
+                            if (respond_to_client(curr_fd, message) < 0)
+                            {
+                                perror("respond to client error");
+                            }
+                        }
+                        else
+                        {
+                            printf("Unable to delete the file\n");
+                            char message[SMALL_SIZE];
+                            bzero(message, SMALL_SIZE);
+                            strcat(message, "Unable to delete the file\n");
+                            if (respond_to_client(curr_fd, message) < 0)
+                            {
+                                perror("respond to client error");
+                            }
                         }
                     }
 
                     else compare_it(msg, "peek", "/pk")
                     {
                         // check if the client has opened a file
-                       
+
                         // open the file and peek it
                         char file_name[128];
                         bzero(file_name, 128);
@@ -528,23 +605,35 @@ int main()
                             strcpy(file_name, msg + strlen("peek") + 1);
 
                         strcat(file_name, ".txt");
+
+                        printf("[DEBUG] the file name is %s and the len is %d\n", file_name, strlen(file_name));
+
                         FILE *fp;
+                        chdir(file_folder);
                         fp = fopen(file_name, "r");
-                        char file_content[1024];
+                        if (fp < 0)
+                        {
+                            perror("file open error");
+                        }
+                        char file_content[BIG_SIZE];
+                        bzero(file_content, BIG_SIZE);
 
                         fseek(fp, 0, SEEK_END); // get the size of the file
                         long file_size = ftell(fp);
                         rewind(fp);
 
                         fread(file_content, file_size, 1, fp);
+                        fclose(fp);
 
                         printf("[DEBUG] the content is: %s\n", file_content);
 
-                        char message_to_client[2048];
+                        char message_to_client[BIG_SIZE];
+                        bzero(message_to_client, BIG_SIZE);
+                        // fclose(fp);
 
                         strcat(message_to_client, "File ");
                         strcat(message_to_client, file_name);
-                        strcat(message_to_client, " content is: \n");
+                        strcat(message_to_client, " content is: ");
                         strcat(message_to_client, file_content);
                         strcat(message_to_client, "\n");
 
@@ -555,11 +644,10 @@ int main()
                         }
 
                         // fwrite(file_content, 1, strlen(file_content), fp);
-                        fclose(fp);
                     }
 
-                    else compare_it(msg,"whoami","who")
-                    {   
+                    else compare_it(msg, "whoami", "who")
+                    {
                         char message[50];
                         bzero(message, 50);
                         strcat(message, "You are user ");
@@ -567,24 +655,45 @@ int main()
                         sprintf(user_fd, "%d", curr_fd);
                         strcat(message, user_fd);
                         strcat(message, "\n");
-                        if(respond_to_client(curr_fd,message) < 0)
+                        if (respond_to_client(curr_fd, message) < 0)
                         {
                             perror("respond to client error");
                         }
-
                     }
 
                     else compare_it(msg, "!close", "/close")
                     {
+
+                        printf("[DEBUG] the client is closing the file\n");
                         // if the client has opened a file then close it
                         if (get_client_by_fd(curr_fd)->isWriting == true)
                         {
                             get_client_by_fd(curr_fd)->isWriting = false;
+
+                            // get the file name he is editing
+                            char file_name[SMALL_SIZE];
+                            bzero(file_name, SMALL_SIZE);
+                            strcpy(file_name, get_client_by_fd(curr_fd)->file_name);
+
+                            struct file_stat *curr_file = get_file_by_name(file_name);
+
+                            curr_file->peers_conn--;
+                            // struct client_stat* curr_client = &curr_file->peers[0];
+                            if (curr_file->peers[0].client_id == curr_fd)
+                            {
+                                curr_file->peers[0].client_id = -1;
+                            }
+                            else
+                            {
+                                curr_file->peers[1].client_id = -1;
+                            }
+                            print_files();
                             if (respond_to_client(curr_fd, "File closed successfully...\n") < 0)
                             {
                                 perror("respond to client error");
                             }
                         }
+
                         else
                         {
                             if (respond_to_client(curr_fd, "You have not opened a file yet... open a file first\n") < 0)
@@ -612,13 +721,12 @@ int main()
                         }
 
                         // printf("print the file in open \n");
-                        print_files();
+                        // print_files();
                         // get the client which issued the command
                         // printf("client_count is %d\n", clients_indx);
 
                         // mark the current client as writing
                         curr_client->isWriting = true;
-
                         // print_clients();
 
                         // client wants to open file
@@ -631,10 +739,11 @@ int main()
 
                         curr_client->file_name = file_name;
                         strcat(file_name, ".txt");
-                        printf("clien wants to open %s\n", file_name);
+                        //printf("client wants to open %s\n", file_name);
+                        curr_client->file_name = file_name;
+
                         chdir(file_folder);
 
-                        // mark the client as busy and file as opened by one
                         bool opened_ok = false;
 
                         // print_files();
@@ -650,11 +759,12 @@ int main()
 
                                 if (file_table[i].peers_conn >= 2)
                                 {
-                                    perror("(open file)lobby already full ...\n");
+                                    perror("(open file) lobby already full ...\n");
                                     if (respond_to_client(curr_fd, "(open file)lobby already full ...\n") < 0)
                                     {
                                         perror("respond to client error");
                                     }
+                                    continue;
                                 }
                                 else
                                 {
@@ -670,6 +780,7 @@ int main()
                                 break;
                             }
                         }
+                        print_files();
 
                         // if the file is found on the server
                         if (opened_ok)
@@ -727,12 +838,11 @@ int main()
                         }
                     }
 
-
-                    else compare_it(msg,"download","/down")
+                    else compare_it(msg, "download", "/down")
                     {
                         printf("client wants to download a file \n");
 
-                        //get the file name 
+                        // get the file name
                         char file_name[32];
                         bzero(file_name, 32);
 
@@ -741,14 +851,11 @@ int main()
 
                         printf("the file name is %s\n", file_name);
 
-                        if(respond_to_client(curr_fd, file_name) < 0)
+                        if (respond_to_client(curr_fd, file_name) < 0)
                         {
                             perror("respond to client error");
                         }
-
                     }
-
-                    
 
                     else compare_it(msg, "seekr", "/skr")
                     {
@@ -789,8 +896,9 @@ int main()
 
                         // list all the names in the file_table
                         printf("client wants to list files\n");
-                        char response[256];
-                        bzero(response, 256);
+                        char response[SMALL_SIZE];
+                        bzero(response, SMALL_SIZE);
+
                         strcat(response, "Files in the server:\n");
                         DIR *d;
                         struct dirent *dir;
@@ -804,7 +912,7 @@ int main()
 
                                 if (strstr(dir->d_name, ".txt") != NULL)
                                 {
-                                    printf("name is %s\n", dir->d_name);
+                                    // printf("[DEBUG] name is %s\n", dir->d_name);
                                     strncat(response, dir->d_name, strlen(dir->d_name));
                                     strcat(response, "\n");
                                     // printf(" the respons is %s\n", response);
@@ -812,9 +920,13 @@ int main()
                                 }
                             }
                         }
+
                         if (strlen(response) == 0)
                             strcpy(response, "No files in the server\n");
                         closedir(d);
+                        chdir("..");
+                        printf("the current directory is %s\n", getcwd(NULL, 0));
+
                         if (respond_to_client(curr_fd, response) < 0)
                         {
                             perror("respond to client error");
@@ -824,7 +936,7 @@ int main()
                     }
 
                     // if the user is writing to a file just append to it and the dispplay it
-                    else if (curr_client->isWriting)
+                    else if (curr_client->isWriting || curr_client->isWriting && strcmp(msg,"\n") == 0 )
                     {
                         printf("the user is writing to a file\n");
                         // get the name of the file he is writing to
@@ -837,11 +949,14 @@ int main()
                         // append the message to the file
                         FILE *fp;
                         fp = fopen(file_name, "a");
+                        printf("[DEBUG] the message for append is %s\n", msg);
                         fwrite(msg, 1, strlen(msg), fp);
                         fclose(fp);
 
                         // get the content of the newly edited file
-                        char file_content[1024];
+                        char file_content[BIG_SIZE];
+                        bzero(file_content, BIG_SIZE);
+
                         fp = fopen(file_name, "ra");
                         fseek(fp, 0, SEEK_END); // get the size of the file
                         long file_size = ftell(fp);

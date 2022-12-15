@@ -9,7 +9,26 @@
 #include <netdb.h>
 #include <string.h>
 #include <signal.h>
+#include <sys/stat.h>
+
 // #include <gtk/gtk.h>
+
+#define SMALL_SIZE 256
+#define MEDIUM_SIZE 1024
+#define BIG_SIZE 2048
+#define DOWNLOADS_DIR "downloads"
+int compare_it_funct(char *msg, char *command1, char *command2)
+{
+    char *token = strtok(msg, " "); // loginaaaa
+
+    if (strcmp(token, command1) == 0 || strcmp(token, command2) == 0)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+#define compare_it(STR1, STR2, STR3) if (compare_it_funct(STR1, STR2, STR3) == 1)
 
 int port;
 int global_sd;
@@ -17,7 +36,7 @@ void encode_message(char *msg, char encoded[])
 {
 
     // printf("%s\n",msg);
-    char encoded_msg[256];
+    char encoded_msg[BIG_SIZE];
     char length[9];
     bzero(length, 9);
 
@@ -118,17 +137,17 @@ int main()
         exit(-1);
     }
 
-    char msg[256];
-    
+    char msg[BIG_SIZE];
+
     // strcpy(msg, "cf");
     while (1)
     {
 
         signal(SIGINT, signal_callback_handler);
-        bzero(msg, 256);
+        bzero(msg, BIG_SIZE);
         // printf("Enter message: ");
 
-        int read_length_stdin = read(0, msg, 256);
+        int read_length_stdin = read(0, msg, BIG_SIZE);
 
         if (read_length_stdin < 0)
         {
@@ -136,8 +155,41 @@ int main()
         }
         // msg[read_length_stdin]=NULL;
 
-        char sentmsg[1000]; // the message that will pe sent according to the protocol
-        bzero(sentmsg, 1000);
+        char sentmsg[BIG_SIZE]; // the message that will pe sent according to the protocol
+        bzero(sentmsg, BIG_SIZE);
+
+        // compare it to download message
+        compare_it(msg, "download", "/down")
+        {
+
+            // get the file name
+            printf("client wants to download a file \n");
+
+            // get the file name
+            char file_name[32];
+            bzero(file_name, 32);
+
+            strcat(file_name, msg + strlen("download") );
+            strcat(file_name, ".txt");
+
+            printf("the file name is %s\n", file_name);
+
+            // go to downloads folder and create the file
+            // create a folder if it doesnt exist
+            int res = mkdir(DOWNLOADS_DIR, 0777);
+
+            if(res == -1)
+            {
+                perror("mkdir failed ");
+            }
+            chdir(DOWNLOADS_DIR);
+
+            // create the file
+            FILE *fp = fopen(file_name, "w");
+
+            fclose(fp);
+            
+        }
 
         encode_message(msg, sentmsg);
 
@@ -153,10 +205,10 @@ int main()
         }
         printf("[DEBUG] message %s sent\n", sentmsg);
 
-        char read_srv[200];
-        bzero(read_srv, 200);
+        char read_srv[BIG_SIZE];
+        bzero(read_srv, BIG_SIZE);
 
-        size_t read_len = read(sd, read_srv, 200);
+        size_t read_len = read(sd, read_srv, BIG_SIZE);
 
         read_srv[read_len] = NULL;
 
@@ -166,10 +218,10 @@ int main()
         }
 
         // decode the message from the server
+        printf("[DEBUG] received message is %s\n", read_srv);
+        char msg_sv[BIG_SIZE]; // decoded message from server
 
-        char msg_sv[200]; // decoded message from server
-
-        bzero(msg_sv, 200);
+        bzero(msg_sv, BIG_SIZE);
         int msg_len_sv = decode_messaje(read_srv, msg_sv);
 
         // printf(" msg  after decode is %s\n",read_srv);
