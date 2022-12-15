@@ -8,47 +8,44 @@
 #include <stdlib.h>
 #include <netdb.h>
 #include <string.h>
-#include<signal.h>
-//#include <gtk/gtk.h>
-
+#include <signal.h>
+// #include <gtk/gtk.h>
 
 int port;
 int global_sd;
-void encode_message(char *msg,char encoded[])
+void encode_message(char *msg, char encoded[])
 {
 
-//printf("%s\n",msg);
-char  encoded_msg[256];
-char length[9];
-bzero(length,9);
+    // printf("%s\n",msg);
+    char encoded_msg[256];
+    char length[9];
+    bzero(length, 9);
 
- sprintf(length,"%d",strlen(msg)); //get the len of the message 
-//printf("%s\n",length);
- //strcpy(encoded,length);
- strcat(encoded,length); //append it to encoded msg
- strcat(encoded,"$");   //append  $ 
- strcat(encoded,msg); //append the message 
-return;
-
+    sprintf(length, "%d", strlen(msg) - 1); // get the len of the message
+    // printf("%s\n",length);
+    // strcpy(encoded,length);
+    strcat(encoded, length); // append it to encoded msg
+    strcat(encoded, "$");    // append  $
+    strcat(encoded, msg);    // append the message
+    return;
 }
- 
 
-int signal_callback_handler(int signum) {
+int signal_callback_handler(int signum)
+{
 
     char encoded[256];
-    bzero(encoded,256);
-    encode_message("exit",encoded);
+    bzero(encoded, 256);
+    encode_message("exit", encoded);
 
-    printf("the message is %s\n",encoded);
+    printf("the message is %s\n", encoded);
     // Terminate program
-    write(global_sd,encoded,strlen(encoded));
-   printf("exit message sent ");
-   close(global_sd);
-   exit(1); // inttreupt   
+    write(global_sd, encoded, strlen(encoded));
+    printf("exit message sent ");
+    close(global_sd);
+    exit(1); // inttreupt
 }
 
-
-// //handler for activate 
+// //handler for activate
 // static void app_activate(GApplication *app, gpointer user_data)
 // {
 //     GtkWidget *win;
@@ -58,33 +55,29 @@ int signal_callback_handler(int signum) {
 //     win = gtk_window_new();
 
 //     gtk_window_set_child(GTK_WINDOW(win), textview);
-//     gtk_window_set_application(GTK_WINDOW(win), GTK_APPLICATION(app)); //connect to app process 
+//     gtk_window_set_application(GTK_WINDOW(win), GTK_APPLICATION(app)); //connect to app process
 //     gtk_window_set_title(GTK_WINDOW(win), "Text editor");
 //     gtk_window_present(GTK_WINDOW(win));
 // }
 
-
-int decode_messaje(char *raw_msg,char* msg)
+int decode_messaje(char *raw_msg, char *msg)
 {
 
     // ex: 4$exit
     char length[8];
     strncpy(length, raw_msg, strchr(raw_msg, '$') - raw_msg);
-    printf("%s\n", length);
+    // printf("%s\n", length);
 
     int length_int = atoi(length);
     char *p = strchr(raw_msg, '$') + 1;
-    printf("%s\n", p);
+    // printf("%s\n", p);
     // bzero(raw_msg,strlen(raw_msg));
     strcpy(msg, p);
     // printf("%s,%d\n", raw_msg, length_int);
     return length_int;
 }
 
-
- 
-
-int main(argc, argv)
+int main()
 {
 
     //  GtkApplication *app;
@@ -113,7 +106,7 @@ int main(argc, argv)
     {
         perror("socket() error");
     }
-    //set global_sd so we can kill il 
+    // set global_sd so we can kill il
 
     global_sd = sd;
     // connect to server
@@ -125,83 +118,70 @@ int main(argc, argv)
         exit(-1);
     }
 
-        char msg[100];
-        //strcpy(msg, "cf");
+    char msg[256];
+    
+    // strcpy(msg, "cf");
     while (1)
     {
-        
-       signal(SIGINT,signal_callback_handler);
-        bzero(msg,100);
-        //printf("Enter message: ");
-        
-       
-    int read_length_stdin = read(0,msg,256);
 
+        signal(SIGINT, signal_callback_handler);
+        bzero(msg, 256);
+        // printf("Enter message: ");
 
-    if(read_length_stdin < 0 )
-    {
-        perror("read error");
+        int read_length_stdin = read(0, msg, 256);
 
-    }
-    //msg[read_length_stdin]=NULL;
-    
-    char sentmsg[1000]; // the message that will pe sent according to the protocol 
-    bzero(sentmsg,100);
+        if (read_length_stdin < 0)
+        {
+            perror("read error");
+        }
+        // msg[read_length_stdin]=NULL;
 
-    encode_message(msg,sentmsg);
-    
-    char length[8];
-    bzero(length,8);
+        char sentmsg[1000]; // the message that will pe sent according to the protocol
+        bzero(sentmsg, 1000);
 
-   
-  
-    sprintf(length,"%d",read_length_stdin);
-    
-    
-        if (write(sd, sentmsg, read_length_stdin+strlen(length)) == -1)
+        encode_message(msg, sentmsg);
+
+        char length[8];
+        bzero(length, 8);
+
+        sprintf(length, "%d", read_length_stdin);
+
+        if (write(sd, sentmsg, read_length_stdin + strlen(length)) == -1)
         {
             perror("write() error");
             exit(-1);
         }
-        printf("[DEBUG] message sent\n");
+        printf("[DEBUG] message %s sent\n", sentmsg);
 
         char read_srv[200];
-        bzero(read_srv,200);
-        size_t read_len = read(sd,read_srv,200);
-        read_srv[read_len]=NULL;
+        bzero(read_srv, 200);
 
-        
-        if( read_len== -1)
+        size_t read_len = read(sd, read_srv, 200);
+
+        read_srv[read_len] = NULL;
+
+        if (read_len == -1)
         {
             perror("read msg");
-
         }
 
-        //decode the message from the server 
+        // decode the message from the server
 
-       
-        char msg_sv[200]; //decoded message from server
+        char msg_sv[200]; // decoded message from server
 
-        bzero(msg_sv,200);
-        int msg_len_sv = decode_messaje(read_srv,msg_sv);
+        bzero(msg_sv, 200);
+        int msg_len_sv = decode_messaje(read_srv, msg_sv);
 
-        
-        //printf(" msg  after decode is %s\n",read_srv);
-        //printf(" msg  len after decode is %d\n",strlen(read_srv));
+        // printf(" msg  after decode is %s\n",read_srv);
+        // printf(" msg  len after decode is %d\n",strlen(read_srv));
 
-        if(msg_len_sv +1 != strlen(msg_sv))
+        if (msg_len_sv != strlen(msg_sv))
         {
             perror("read not complete");
         }
 
-        
-
-        else 
-        {
-            printf("[SERVER] %s\n",msg_sv);
-
-        }
-
+        else
+            printf("[SERVER] %s\n", msg_sv);
     }
     close(sd);
 }

@@ -139,6 +139,7 @@ void encode_message(char *msg, char encoded[])
     strcat(encoded, msg);    // append the message
 
     encoded_msg[strlen(encoded_msg)] = NULL;
+    // printf("the encoded message is: %s\n", encoded);
     return;
 }
 
@@ -281,8 +282,11 @@ int main()
             new_client.logged_in = false;
             clients_table[clients_indx++] = new_client;
 
+            // if(respond_to_client(client_fd,"Welcome to the server")<0)
+            //     perror("error sending welcome message");
+
             printf("new client added to table \n");
-            // print_clients();
+            print_clients();
             // change the length of max sd
             if (max_sd < client_fd)
                 max_sd = client_fd;
@@ -307,34 +311,24 @@ int main()
                 }
 
                 fflush(stdout);
-                // int pipe_ends[2];
-                // size_t create_pipe = pipe(pipe_ends);
 
-                // if (create_pipe < 0)
-                // {
-                //     perror("(pipe) error");
-                // }
-
-                // pid_t pid = fork();
-
-                // if (pid == 0)
-                //{
-                //  child
-                // close(pipe_ends[0]); // close for read
                 char msg[256];
                 char raw_msg[256];
                 bzero(raw_msg, 256);
                 bzero(msg, 256);
 
-                // read in child
                 size_t read_len = read(curr_fd, raw_msg, 256);
+
                 // print_clients();
+
                 if (read_len < 0)
                 {
                     perror("(read) error");
                 }
 
                 int msg_len = decode_messaje(raw_msg, msg);
+                printf("read len is %d and len of msg is %d\n", read_len, strlen(msg));
+
                 msg[strcspn(msg, "\n")] = NULL; // eliminate the new line character
                 printf("msg after decode is %s with length %d\n", msg, strlen(msg));
 
@@ -345,22 +339,19 @@ int main()
 
                 // handle the client's command to the server
                 // printf("message is %s\n", msg);
+
                 compare_it(msg, "exit", "/exit")
                 {
                     close(curr_fd);
                     printf("client wants to exit\n");
                     break;
-                    // remove the client from the table
-                    // for (int i = 0; i < clients_indx; i++)
-                    // {
-                    //     if (clients_table[i].client_id == curr_fd)
-                    //     {
-                    //         clients_table[i].client_id = -1;
-                    //         clients_table[i].isWriting = false;
-                    //         break;
-                    //     }
-                    // }
+                    struct client *curr_client = get_client_by_fd(curr_fd);
+                    curr_client->isWriting = false;
+                    curr_client->logged_in = false;
+                    curr_client->client_id = -1;
+                    continue;
                 }
+
                 compare_it(msg, "login", "/l")
                 {
                     // check if he is logged in
@@ -376,8 +367,8 @@ int main()
                         {
                             perror("respond to client error");
                         }
-
-                        // exit(0);
+                        // continue;
+                        //  exit(0);
                     }
 
                     else
@@ -397,12 +388,35 @@ int main()
                         // write(pipe_ends[WRITE_END], "You are now logged in\n", strlen("You are now logged in\n"));
                         // exit(0);
                     }
+
+                    continue;
                 }
 
+                else compare_it(msg, "help", "/h")
+                {
+                    printf("client wants help\n");
+                    char response[1024];
+                    bzero(response, 256);
+                    strcat(response, "Commands:\n");
+                    strcat(response, "open <file_name> - open a file\n");
+                    strcat(response, "list-files - list all the files in the server\n");
+                    strcat(response, "close - close the file you opened\n");
+                    strcat(response, "exit - exit the server\n");
+                    if (respond_to_client(curr_fd, response) < 0)
+                    {
+                        perror("respond to client error");
+                    }
+                    continue;
+                }
+
+               // print_clients();
                 // he can execute commands only if he is logged in
+                // printf("the message is %s\n", msg);
+
                 if (get_client_by_fd(curr_fd)->logged_in == false)
                 {
-                    if (respond_to_client(curr_fd, "You are not logged in\n") < 0)
+                    printf("got here\n");
+                    if (respond_to_client(curr_fd, "You are not logged in... login with 'login' \n") < 0)
                     {
                         perror("respond to client error");
                     }
@@ -410,10 +424,14 @@ int main()
                     /// exit(0);
                 }
 
+                // else if(1){printf("alalaalalla");}
+
                 // he is logged in so he can issue commands to the server
                 else
                 {
-                    // printf('got here\n');
+
+                    // printf("got here in else inside \n");
+
                     compare_it(msg, "--create-file", "crf")
                     {
 
@@ -492,59 +510,108 @@ int main()
                         }
                     }
 
-                    else compare_it(msg,"peek","/pk")
+                    else compare_it(msg, "peek", "/pk")
                     {
+                        // check if the client has opened a file
+                       
+                        // open the file and peek it
+                        char file_name[128];
+                        bzero(file_name, 128);
 
-                    //open the file and peek it 
-                    char file_name[128];
-                    bzero(file_name, 128);
+                        // get the file name
+                        if (strstr(msg, "/pk") != NULL)
+                        {
+                            strcat(file_name, msg + 3);
+                        }
 
-                    //get the file name 
-                    if (strstr(msg, "/pk") != NULL)
-                    {
-                        strcat(file_name, msg + 3);
-                    
+                        else
+                            strcpy(file_name, msg + strlen("peek") + 1);
+
+                        strcat(file_name, ".txt");
+                        FILE *fp;
+                        fp = fopen(file_name, "r");
+                        char file_content[1024];
+
+                        fseek(fp, 0, SEEK_END); // get the size of the file
+                        long file_size = ftell(fp);
+                        rewind(fp);
+
+                        fread(file_content, file_size, 1, fp);
+
+                        printf("[DEBUG] the content is: %s\n", file_content);
+
+                        char message_to_client[2048];
+
+                        strcat(message_to_client, "File ");
+                        strcat(message_to_client, file_name);
+                        strcat(message_to_client, " content is: \n");
+                        strcat(message_to_client, file_content);
+                        strcat(message_to_client, "\n");
+
+                        // printf("the messsage is %s\n", message_to_client);
+                        if (respond_to_client(curr_fd, message_to_client) < 0)
+                        {
+                            perror("respond to client error");
+                        }
+
+                        // fwrite(file_content, 1, strlen(file_content), fp);
+                        fclose(fp);
                     }
 
-                    else
-                        strcpy(file_name, msg + strlen("peek") + 1);
+                    else compare_it(msg,"whoami","who")
+                    {   
+                        char message[50];
+                        bzero(message, 50);
+                        strcat(message, "You are user ");
+                        char user_fd[10];
+                        sprintf(user_fd, "%d", curr_fd);
+                        strcat(message, user_fd);
+                        strcat(message, "\n");
+                        if(respond_to_client(curr_fd,message) < 0)
+                        {
+                            perror("respond to client error");
+                        }
 
-                    strcat(file_name, ".txt");
-                    FILE * fp;
-                    fp = fopen(file_name,"r");
-                     char file_content[1024];
+                    }
 
-                            fseek(fp, 0, SEEK_END); // get the size of the file
-                            long file_size = ftell(fp);
-                            rewind(fp);
-
-                            fread(file_content, file_size, 1, fp);
-
-                            printf("[DEBUG] the content is: %s\n", file_content);
-
-                            char message_to_client[2048];
-
-                            strcat(message_to_client, "File ");
-                            strcat(message_to_client, file_name);
-                            strcat(message_to_client, " content is: \n");
-                            strcat(message_to_client, file_content);
-                            strcat(message_to_client, "\n");
-                            strcat(message_to_client, "<everything you write will be appended to the file...>\n");
-                            strcat(message_to_client, "<type 'close' to close the file>\n");
-
-                            // printf("the messsage is %s\n", message_to_client);
-                            if (respond_to_client(curr_fd, message_to_client) < 0)
+                    else compare_it(msg, "!close", "/close")
+                    {
+                        // if the client has opened a file then close it
+                        if (get_client_by_fd(curr_fd)->isWriting == true)
+                        {
+                            get_client_by_fd(curr_fd)->isWriting = false;
+                            if (respond_to_client(curr_fd, "File closed successfully...\n") < 0)
                             {
                                 perror("respond to client error");
                             }
-
-                            // fwrite(file_content, 1, strlen(file_content), fp);
-                            fclose(fp);
+                        }
+                        else
+                        {
+                            if (respond_to_client(curr_fd, "You have not opened a file yet... open a file first\n") < 0)
+                            {
+                                perror("respond to client error");
+                            }
+                        }
                     }
 
                     else compare_it(msg, "edit", "open")
                     {
-                        printf("print the file in open \n");
+
+                        // if the client already edits a file then he cannot edit another one
+                        if (curr_client->isWriting)
+                        {
+                            char message[100];
+                            bzero(message, 100);
+                            strcat(message, "You are already editing a file...\n");
+                            strcat(message, "Please close the file with ' !close '  before opening another one...\n");
+                            if (respond_to_client(curr_fd, message) < 0)
+                            {
+                                perror("respond to client error");
+                            }
+                            continue;
+                        }
+
+                        // printf("print the file in open \n");
                         print_files();
                         // get the client which issued the command
                         // printf("client_count is %d\n", clients_indx);
@@ -561,12 +628,6 @@ int main()
                         // get the name of the file to open
 
                         strcpy(file_name, msg + 5);
-                        // if (strstr(msg, "edit") != NULL)
-
-                        // else
-                        //     strcpy(file_name, msg + 5);
-
-                        // strncpy(file_name, msg + 5,strchr(msg,"\n")-msg);
 
                         curr_client->file_name = file_name;
                         strcat(file_name, ".txt");
@@ -575,6 +636,7 @@ int main()
 
                         // mark the client as busy and file as opened by one
                         bool opened_ok = false;
+
                         // print_files();
                         for (int i = 0; i < file_struct_indx; i++)
                         {
@@ -609,10 +671,11 @@ int main()
                             }
                         }
 
+                        // if the file is found on the server
                         if (opened_ok)
                         {
 
-                            print_files();
+                            // print_files();
 
                             // just open the file in append mode
                             FILE *fp;
@@ -638,7 +701,7 @@ int main()
                             strcat(message_to_client, file_content);
                             strcat(message_to_client, "\n");
                             strcat(message_to_client, "<everything you write will be appended to the file...>\n");
-                            strcat(message_to_client, "<type 'close' to close the file>\n");
+                            strcat(message_to_client, "<type ' !close '  to close the file>\n");
 
                             // printf("the messsage is %s\n", message_to_client);
                             if (respond_to_client(curr_fd, message_to_client) < 0)
@@ -664,8 +727,66 @@ int main()
                         }
                     }
 
+
+                    else compare_it(msg,"download","/down")
+                    {
+                        printf("client wants to download a file \n");
+
+                        //get the file name 
+                        char file_name[32];
+                        bzero(file_name, 32);
+
+                        strcat(file_name, msg + 8);
+                        strcat(file_name, ".txt");
+
+                        printf("the file name is %s\n", file_name);
+
+                        if(respond_to_client(curr_fd, file_name) < 0)
+                        {
+                            perror("respond to client error");
+                        }
+
+                    }
+
+                    
+
+                    else compare_it(msg, "seekr", "/skr")
+                    {
+                        if (get_client_by_fd(curr_fd)->isWriting == false)
+                        {
+                            if (respond_to_client(curr_fd, "You have not opened a file yet... open a file first\n") < 0)
+                            {
+                                perror("respond to client error");
+                            }
+                            continue;
+                        }
+                        printf("client wants to seek a file to the right \n");
+                        if (respond_to_client(curr_fd, "seekr") < 0)
+                        {
+                            perror("respond to client error");
+                        }
+                    }
+
+                    else compare_it(msg, "seekl", "/skl")
+                    {
+                        if (get_client_by_fd(curr_fd)->isWriting == false)
+                        {
+                            if (respond_to_client(curr_fd, "You have not opened a file yet... open a file first\n") < 0)
+                            {
+                                perror("respond to client error");
+                            }
+                            continue;
+                        }
+                        printf("client wants to seek a file to the left \n");
+                        if (respond_to_client(curr_fd, "seekl") < 0)
+                        {
+                            perror("respond to client error");
+                        }
+                    }
+
                     else compare_it(msg, "list-files", "ls")
                     {
+
                         // list all the names in the file_table
                         printf("client wants to list files\n");
                         char response[256];
@@ -701,22 +822,6 @@ int main()
 
                         // write(pipe_ends[1], response, strlen(response));
                     }
-
-                    // else compare_it(msg, "help", '/h')
-                    // {
-                    //     printf("client wants help\n");
-                    //     char response[1024];
-                    //     bzero(response, 256);
-                    //     strcat(response, "Commands:\n");
-                    //     strcat(response, "open <file_name> - open a file\n");
-                    //     strcat(response, "list-files - list all the files in the server\n");
-                    //     strcat(response, "close - close the file you opened\n");
-                    //     strcat(response, "exit - exit the server\n");
-                    //     if (respond_to_client(curr_fd, response) < 0)
-                    //     {
-                    //         perror("respond to client error");
-                    //     }
-                    // }
 
                     // if the user is writing to a file just append to it and the dispplay it
                     else if (curr_client->isWriting)
@@ -760,12 +865,20 @@ int main()
                             perror("respond to client error");
                         }
                     }
+                    // else
+                    // {
+
+                    //     if (respond_to_client(curr_fd, "Invalid command.. please try 'help' \n") < 0)
+                    //     {
+                    //         perror("respond to client error");
+                    //     }
+                    // }
                 }
 
                 // loop through client and see if he is connected to a file and append the text to it
                 // if curr_fd ==  curr_client from list then append to the file opened by him
 
-                fflush(stdout);
+                // fflush(stdout);
                 // exit(0); // the process has finished
             }
             //}
@@ -789,8 +902,9 @@ int main()
             //     perror("(read error) from child");
             // }
 
-            char encoded_msg[256];
-            bzero(encoded_msg, 256);
+            // char encoded_msg[256];
+            // bzero(encoded_msg, 256);
+
             // if (strstr(msj, "exit") != NULL)
             // {
 
