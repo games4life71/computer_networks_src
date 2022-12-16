@@ -148,7 +148,7 @@ int main()
         // printf("Enter message: ");
 
         int read_length_stdin = read(0, msg, BIG_SIZE);
-
+        // printf("the message is %s\n", msg);
         if (read_length_stdin < 0)
         {
             perror("read error");
@@ -158,82 +158,172 @@ int main()
         char sentmsg[BIG_SIZE]; // the message that will pe sent according to the protocol
         bzero(sentmsg, BIG_SIZE);
 
+        // copy of the message
+        char msgcopy[BIG_SIZE];
+        bzero(msgcopy, BIG_SIZE);
+        strcpy(msgcopy, msg);
+        msg[strcspn(msg, "\n")] = NULL;
+
+        // printf("the message  copy is %s and the msg is %s\n", msgcopy,msg);
         // compare it to download message
-        compare_it(msg, "download", "/down")
+        compare_it(msgcopy, "download", "/down")
         {
 
             // get the file name
-            printf("client wants to download a file \n");
+            // printf("client wants to download a file \n");
 
             // get the file name
-            char file_name[32];
-            bzero(file_name, 32);
-
-            strcat(file_name, msg + strlen("download") );
+            char file_name[MEDIUM_SIZE];
+            bzero(file_name, MEDIUM_SIZE);
+            // printf("the msg is %s\n", msg);
+            strncat(file_name, msg + strlen("download"), strlen(msg) - 1);
             strcat(file_name, ".txt");
 
-            printf("the file name is %s\n", file_name);
+            // /printf("the file name is %s\n", file_name);
+
+            // wait for response from server
+            // write the message to the server
+            // encode the message
+            encode_message(msg, sentmsg);
+
+            write(sd, sentmsg, strlen(sentmsg));
+            printf("download message sent \n");
+
+            char response[BIG_SIZE];
+            bzero(response, BIG_SIZE);
+            int read_length = read(sd, response, BIG_SIZE); // read response from server
+            if (read_length < 0)
+            {
+                perror("read error");
+            }
+            // printf("%s\n", response);
+            //  if the file is not present in the server or the user is not logged in
+             char response_decoded[BIG_SIZE];
+            bzero(response_decoded, BIG_SIZE);
+            int len = decode_messaje(response, response_decoded);
+
+            // /printf("len is %d and read length is %d\n", len, read_length);
+            if (len != strlen(response_decoded))
+            {
+                perror("error in decoding or writing");
+            }
+            
+            printf("[SERVER] %s\n", response_decoded);
+            if (strstr(response, "not logged in") != NULL || strstr(response, "not found") != NULL)
+            {
+                //printf("ba nu a gasito sa mor eu !\n");
+                continue;
+            }
+
+
+            //sent ready to server
+            char ready[SMALL_SIZE];
+            bzero(ready, SMALL_SIZE);
+            strcpy(ready, "ready");
+            bzero(sentmsg, BIG_SIZE);
+            encode_message(ready, sentmsg);
+            write(sd, sentmsg, strlen(sentmsg));  // ---> to server 
+            printf("[DEBUG] ready message sent \n");
+
+            //now receive the file from server 
+
+
+            char file_content[BIG_SIZE];
+            bzero(file_content, BIG_SIZE);
+            read_length = read(sd, file_content, BIG_SIZE); // read response from server
+            printf("read length is %d\n", read_length);
+            if (read_length < 0)
+            {
+                perror("read error");
+            }
+            printf("[DEBUG] file content received with the content: \n %s \n",file_content);
 
             // go to downloads folder and create the file
             // create a folder if it doesnt exist
             int res = mkdir(DOWNLOADS_DIR, 0777);
 
-            if(res == -1)
+            if (res == -1 && strstr(strerror(errno), "File exists") != NULL)
             {
-                perror("mkdir failed ");
+                printf("[DEBUG] the folder already exists\n");
             }
+
             chdir(DOWNLOADS_DIR);
 
             // create the file
             FILE *fp = fopen(file_name, "w");
-
+            //write the content to the file
+            //decode the message
+            char file_content_decoded[BIG_SIZE];
+            bzero(file_content_decoded, BIG_SIZE);
+            int len_file = decode_messaje(file_content, file_content_decoded);
+            if (len_file != strlen(file_content_decoded))
+            {
+                perror("error in decoding or writing");
+            }
+            fwrite(file_content_decoded, 1, strlen(file_content_decoded), fp);
             fclose(fp);
-            
-        }
 
-        encode_message(msg, sentmsg);
+            chdir("..");
+            // read another response
+            //bzero(response, BIG_SIZE);
+            // /read_length = read(sd, response, BIG_SIZE); // read response from server if the file is found or not
 
-        char length[8];
-        bzero(length, 8);
-
-        sprintf(length, "%d", read_length_stdin);
-
-        if (write(sd, sentmsg, read_length_stdin + strlen(length)) == -1)
-        {
-            perror("write() error");
-            exit(-1);
-        }
-        printf("[DEBUG] message %s sent\n", sentmsg);
-
-        char read_srv[BIG_SIZE];
-        bzero(read_srv, BIG_SIZE);
-
-        size_t read_len = read(sd, read_srv, BIG_SIZE);
-
-        read_srv[read_len] = NULL;
-
-        if (read_len == -1)
-        {
-            perror("read msg");
-        }
-
-        // decode the message from the server
-        printf("[DEBUG] received message is %s\n", read_srv);
-        char msg_sv[BIG_SIZE]; // decoded message from server
-
-        bzero(msg_sv, BIG_SIZE);
-        int msg_len_sv = decode_messaje(read_srv, msg_sv);
-
-        // printf(" msg  after decode is %s\n",read_srv);
-        // printf(" msg  len after decode is %d\n",strlen(read_srv));
-
-        if (msg_len_sv != strlen(msg_sv))
-        {
-            perror("read not complete");
+            // write confirmation to server
+            // char confirmation[BIG_SIZE];
+            // bzero(confirmation, BIG_SIZE);
+            // strcpy(confirmation, "file downloaded correctly...");
+            // bzero(sentmsg, BIG_SIZE);
+            // encode_message(confirmation, sentmsg);
+            // write(sd, sentmsg, strlen(sentmsg));
         }
 
         else
-            printf("[SERVER] %s\n", msg_sv);
+        {
+
+            encode_message(msg, sentmsg);
+
+            char length[8];
+            bzero(length, 8);
+
+            sprintf(length, "%d", read_length_stdin);
+            // printf("the message is %s and the length is %s\n", sentmsg, length);
+            if (write(sd, sentmsg, read_length_stdin + strlen(length)) == -1)
+            {
+                perror("write() error");
+                exit(-1);
+            }
+            printf("[DEBUG] message %s sent\n", sentmsg);
+
+            char read_srv[BIG_SIZE];
+            bzero(read_srv, BIG_SIZE);
+
+            size_t read_len = read(sd, read_srv, BIG_SIZE);
+
+            read_srv[read_len] = NULL;
+
+            if (read_len == -1)
+            {
+                perror("read msg");
+            }
+
+            // decode the message from the server
+           // printf("[DEBUG] received message is %s\n", read_srv);
+            char msg_sv[BIG_SIZE]; // decoded message from server
+
+            bzero(msg_sv, BIG_SIZE);
+            int msg_len_sv = decode_messaje(read_srv, msg_sv);
+
+            // printf(" msg  after decode is %s\n",read_srv);
+            // printf(" msg  len after decode is %d\n",strlen(read_srv));
+
+            if (msg_len_sv != strlen(msg_sv))
+            {
+                perror("read not complete");
+            }
+
+            else
+                printf("[SERVER] %s\n", msg_sv);
+        }
     }
     close(sd);
 }
