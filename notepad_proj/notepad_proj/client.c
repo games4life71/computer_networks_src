@@ -40,6 +40,10 @@ void encode_message(char *msg, char encoded[])
     char length[9];
     bzero(length, 9);
 
+    if(strlen(msg) == 0){
+        strcpy(encoded, "0$");
+        return;
+    }
     sprintf(length, "%d", strlen(msg) - 1); // get the len of the message
     // printf("%s\n",length);
     // strcpy(encoded,length);
@@ -88,6 +92,9 @@ int decode_messaje(char *raw_msg, char *msg)
     // printf("%s\n", length);
 
     int length_int = atoi(length);
+    if(length_int == 0){
+        return 0;
+    }   
     char *p = strchr(raw_msg, '$') + 1;
     // printf("%s\n", p);
     // bzero(raw_msg,strlen(raw_msg));
@@ -278,9 +285,21 @@ int main()
         }
 
         else
-        {
+        {   
+            if(strcmp(msg,"\n") == 0 || strlen(msg) == 0 ){
+                printf("empty message\n");
+                //printf("empty message\n");
+                //dont encode it
+                //strcpy(sentmsg, msg); 
+                strcat(sentmsg, "\n");
+                //continue;
+            }
 
+           
+            //the message isnt empty so we encode it 
             encode_message(msg, sentmsg);
+            
+            printf("the sent message is %s\n", sentmsg);
 
             char length[8];
             bzero(length, 8);
