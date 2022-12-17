@@ -68,20 +68,7 @@ int signal_callback_handler(int signum)
     exit(1); // inttreupt
 }
 
-// //handler for activate
-// static void app_activate(GApplication *app, gpointer user_data)
-// {
-//     GtkWidget *win;
-//     GtkWidget *textview;
 
-//     textview = gtk_text_view_new();
-//     win = gtk_window_new();
-
-//     gtk_window_set_child(GTK_WINDOW(win), textview);
-//     gtk_window_set_application(GTK_WINDOW(win), GTK_APPLICATION(app)); //connect to app process
-//     gtk_window_set_title(GTK_WINDOW(win), "Text editor");
-//     gtk_window_present(GTK_WINDOW(win));
-// }
 
 int decode_messaje(char *raw_msg, char *msg)
 {
