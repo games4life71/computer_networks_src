@@ -44,7 +44,7 @@ void encode_message(char *msg, char encoded[])
         strcpy(encoded, "0$");
         return;
     }
-    sprintf(length, "%d", strlen(msg) - 1); // get the len of the message
+    sprintf(length, "%d", strlen(msg)); // get the len of the message
     // printf("%s\n",length);
     // strcpy(encoded,length);
     strcat(encoded, length); // append it to encoded msg
