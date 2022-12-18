@@ -1,0 +1,5 @@
+server succesfully created
+new client connected with fd 4
+client with fd 4 logged in
+User 4 opened file 11.txt
+4 seekr 106 106

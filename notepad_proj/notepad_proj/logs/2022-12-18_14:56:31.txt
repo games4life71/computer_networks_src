@@ -1,0 +1,3 @@
+server succesfully created
+new client connected with fd 4
+client with fd 4 logged in

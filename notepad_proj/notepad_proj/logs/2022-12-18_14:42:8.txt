@@ -1,0 +1,13 @@
+server succesfully created
+new client connected with fd 4
+new client connected with fd 5
+client with fd 5 disconnected
+new client connected with fd 5
+client with fd 5 logged in
+client with fd 4 logged in
+client with fd 5 deleted file c .txt
+client with fd 4 deleted file b.txt
+client with fd 4 deleted file 11.txt
+client with fd 4 deleted file 123.txt
+client with fd 5 disconnected
+server is shutting down

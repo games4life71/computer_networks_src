@@ -268,6 +268,7 @@ int main()
         perror("socket() error");
         exit(-1);
     }
+    
     setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
     bzero(&server, sizeof(server));
@@ -316,6 +317,7 @@ int main()
     // get the date
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
+
     sprintf(log_file_name, "%d-%d-%d_%d:%d:%d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
     strcat(log_file_name, ".txt");
     // printf("log file name is %s\n", log_file_name);
@@ -346,7 +348,7 @@ int main()
         bcopy(&all_fds, &readfds, sizeof(all_fds));
         int activity = select(max_sd + 1, &readfds, NULL, NULL, &tv);
 
-        if ((activity < 0))
+        if ((activity  < 0) )
         {
 
             printf("Waiting for clients to connect...\n");
@@ -355,6 +357,7 @@ int main()
         // fflush(stdout);
         // printf("the client with fd %d wants to conn\n", activity);
         //  if anyone wants too connect
+
         if (FD_ISSET(sd, &readfds))
         {
             // prepare connect for client
@@ -395,24 +398,26 @@ int main()
             if (max_sd < client_fd)
                 max_sd = client_fd;
         }
-
+        
         // check for any activity from other clients
         for (int curr_fd = 0; curr_fd <= max_sd; curr_fd++)
         {
 
             signal(SIGINT, signal_callback_handler);
+
             if (FD_ISSET(curr_fd, &readfds) && curr_fd != sd)
             {
                 // handle the client activity
                 // maybe threads ?? or fork
 
-                // /printf("curr fd is %d\n",curr_fd);
+                
                 // extract the client from the table
                 struct client *curr_client = get_client_by_fd(curr_fd);
+
                 // print_client_info(curr_client);
                 if (curr_client == NULL)
                 {
-                    perror("client not found");
+                    //perror("client not found");
                     continue;
                 }
 
@@ -459,16 +464,16 @@ int main()
 
                 // handle the client's command to the server
                 // printf("message is %s\n", msg);
+                
                 if (strlen(msg) == 0 && curr_client->isWriting == true)
                 {
-                    printf("the message is empty\n");
+                    printf("[DEBUG] the message is empty\n");
                     strcat(msg, "\n");
                 }
 
                 compare_it(msg, "exit", "/exit")
                 {
-                    close(curr_fd);
-                    printf("client wants to exit\n");
+                    printf("[DEBUG] client wants to exit\n");
 
                     // struct file_stat *curr_file;
                     if (curr_client->isWriting)
@@ -512,6 +517,7 @@ int main()
                     sprintf(event, "client with fd %d disconnected\n", curr_fd);
                     log_event(event, log_file_name);
 
+                    //fclose(curr_fd);
                     continue;
                 }
                 compare_it(msg, "login", "/l")
@@ -530,15 +536,13 @@ int main()
 
                     if (curr_client->logged_in == true)
                     {
-                        // write(pipe_ends[WRITE_END], "You are already logged in\n", strlen("You are already logged in\n"));
                         // respond to client
 
-                        if (respond_to_client(curr_fd, "You are already logged in\n") < 0)
+                        if (respond_to_client(curr_fd, "You are already logged in ! \n") < 0)
                         {
                             perror("respond to client error");
                         }
-                        // continue;
-                        //  exit(0);
+                       
                     }
 
                     else
@@ -573,8 +577,11 @@ int main()
                     char response[1024];
                     bzero(response, 1024);
                     strcat(response, "Commands:\n");
+                    strcat(response,"\n");
+                    strcat(response, "create file <file_name> / crf <file_name>  - create a file\n");
+                    strcat(response, "peek <file_name> - peek at a file without opening it \n");
                     strcat(response, "open <file_name> - open a file\n");
-                    strcat(response, "list-files - list all the files in the server\n");
+                    strcat(response, "list-files/ls  - list all the files in the server\n");
                     strcat(response, "!close - close the file you opened\n");
                     strcat(response, "exit - exit the server\n");
                     strcat(response, "login - login to the server\n");
@@ -585,6 +592,7 @@ int main()
                     strcat(response, "seekr <value>  -seek right info a file \n");
                     strcat(response, "delete <file_name> - delete a file\n");
                     strcat(response, "get-pos - get the current position in the file\n");
+                    strcat(response, "backspace <value> - delete <value> characters from the current position\n");
                     if (respond_to_client(curr_fd, response) < 0)
                     {
                         perror("respond to client error");
@@ -599,7 +607,7 @@ int main()
                 if (get_client_by_fd(curr_fd)->logged_in == false)
                 {
                     // printf("got here\n");
-                    if (respond_to_client(curr_fd, "You are not logged in... login with 'login' \n") < 0)
+                    if (respond_to_client(curr_fd, "You are not logged in... login with 'login' or see 'help' section \n") < 0)
                     {
                         perror("respond to client error");
                     }
@@ -612,10 +620,9 @@ int main()
                 // he is logged in so he can issue commands to the server
                 else
                 {
-
                     // printf("got here in else inside \n");
 
-                    compare_it(msg, "--create-file", "crf")
+                    compare_it(msg, "create-file", "crf")
                     {
 
                         if (curr_client->isWriting == true)
@@ -752,12 +759,13 @@ int main()
                         //  print_clients();
 
                         // for all clients
-
+                        bool found = false;
                         for (int i = 0; i < clients_indx; i++)
                         {
                             struct client *curr_client = &clients_table[i];
                             print_client_info(curr_client);
                             // if the client is connected to the file
+
                             if (curr_client->isWriting == true)
                             {
                                 if (strcmp(curr_client->file_name, file_name) == 0)
@@ -775,10 +783,14 @@ int main()
                                     {
                                         perror("respond to client error");
                                     }
-
-                                    continue;
+                                    found = true;
+                                    break;
                                 }
                             }
+                        }
+
+                        if(found == true){
+                            continue;
                         }
 
                         chdir(file_folder);
@@ -897,6 +909,7 @@ int main()
 
                         // fwrite(file_content, 1, strlen(file_content), fp);
                     }
+            
                     else compare_it(msg, "get-pos", "/get-pos")
                     {
                         if (curr_client->isWriting == false)
@@ -933,6 +946,7 @@ int main()
                             perror("respond to client error");
                         }
                     }
+   
                     else compare_it(msg, "whoami", "who")
                     {
 
@@ -957,7 +971,7 @@ int main()
                             perror("respond to client error");
                         }
                     }
-
+     
                     else compare_it(msg, "!close", "/close")
                     {
 
@@ -1016,7 +1030,7 @@ int main()
                             }
                         }
                     }
-
+ 
                     else compare_it(msg, "edit", "open")
                     {
                         // printf("the message is %s\n", msg);
@@ -1034,9 +1048,9 @@ int main()
                             continue;
                         }
 
-                        if (strcmp(msg_cpy, "edit") == 0 || strcmp(msg_cpy, "open") == 0)
+                        if ((strcmp(msg_cpy, "edit") == 0 || strcmp(msg_cpy, "open") == 0) || strlen(msg_cpy) == 4)
                         {
-                            if (respond_to_client(curr_fd, "Please enter a file name to open/edit \n") < 0)
+                            if (respond_to_client(curr_fd, "Please enter a file name to open/edit... \n") < 0)
                             {
                                 perror("respond to client error");
                             }
@@ -1050,9 +1064,11 @@ int main()
                         // get the name of the file to open
 
                         strcpy(file_name, msg + 5);
+                       
+                        
                         strcat(file_name, ".txt");
 
-                        // printf("client wants to open %s\n", file_name);
+                        printf("client wants to open %s with len %d \n", file_name,strlen(file_name));
 
                         chdir(file_folder);
 
@@ -1063,7 +1079,7 @@ int main()
                         {
 
                             // search the file in the table and mark it
-                            if (strstr(file_table[i].file_name, file_name) != NULL) // if the name is present
+                            if (strcmp(file_table[i].file_name, file_name) ==0) // if the name is present
                             {
 
                                 // mark in the table
@@ -1093,6 +1109,7 @@ int main()
                             }
                         }
                         print_files();
+                       // printf("opened ok is %d\n", opened_ok);
 
                         // if the file is found on the server
                         if (opened_ok)
@@ -1429,11 +1446,6 @@ int main()
 
                         curr_file->pointer_pos = ftell(fp);
 
-                        // long file_size = ftell(fp);
-                        // rewind(fp);
-
-                        // int curr_pos = curr_file->pointer_pos;
-                        // printf("[DEBUG] the current position is %d in file %s \n ", ftell(fp), curr_file->file_name);
                         char response[SMALL_SIZE];
                         bzero(response, SMALL_SIZE);
                         strcat(response, "Current position is : ");
@@ -1722,6 +1734,8 @@ int main()
                         fread(file_content, file_size, 1, fp);
                         fclose(fp);
 
+                        // if uncommented the server will crash :)
+
                         //     char event[MEDIUM_SIZE];
                         //     bzero(event, MEDIUM_SIZE);
 
@@ -1746,7 +1760,6 @@ int main()
                         }
                         // printf("[DEBUG] the file name he is editing is %s and the message is %s\n", curr_client->file_name, msg_cpy);
                     }
-
                     // if the msg didnt match any of the commands then send an error message
                     else if (!compare_it_funct(msg, "login", "/l"))
                     {

@@ -1,0 +1,46 @@
+server succesfully created
+new client connected with fd 4
+new client connected with fd 5
+client with fd 5 disconnected
+client with fd 4 logged in
+new client connected with fd 6
+client with fd 6 logged in
+client with fd 6 disconnected
+client with fd 4 disconnected
+new client connected with fd 7
+client with fd 7 logged in
+new client connected with fd 8
+new client connected with fd 9
+client with fd 9 logged in
+User 9 opened file 1.txt
+User 7 opened file 1.txt
+client with fd 8 logged in
+User 8 wants to download file 1.txt
+User 8 wants to download file 1.txt
+client with fd 8 disconnected
+User 9 closed the file 1.txt
+User 7 closed the file 1.txt
+client with fd 9 disconnected
+new client connected with fd 10
+client with fd 10 logged in
+client with fd 7 created file 123.txt
+new client connected with fd 11
+client with fd 11 logged in
+User 11 opened file 123.txt
+User 10 opened file 123.txt
+client with fd 11 disconnected
+client with fd 10 disconnected
+new client connected with fd 13
+client with fd 13 logged in
+client with fd 13 deleted file 123.txt
+client with fd 7 deleted file 1.txt
+new client connected with fd 14
+client with fd 14 logged in
+client with fd 14 created file 123.txt
+User 14 opened file 123.txt
+client with fd 13 deleted file 123.txt
+User 14 closed the file 123.txt
+client with fd 7 created file 1.txt
+client with fd 14 created file 123.txt
+User 14 opened file 123.txt
+client with fd 7 deleted file 123.txt

@@ -1,0 +1,10 @@
+server succesfully created
+new client connected with fd 4
+new client connected with fd 5
+client with fd 5 disconnected
+client with fd 4 logged in
+new client connected with fd 6
+client with fd 6 logged in
+client with fd 4 disconnected
+client with fd 6 disconnected
+server is shutting down
