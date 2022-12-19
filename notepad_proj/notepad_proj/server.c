@@ -226,8 +226,8 @@ void log_event(char *event, char *log_file)
     FILE *fp = fopen(log_file, "a");
     fwrite(event, strlen(event), 1, fp);
     fclose(fp);
-    printf("the curent folder is: %s \n", getcwd(NULL, 0));
-    // chdir("..");
+    // printf("the curent folder is: %s \n", getcwd(NULL, 0));
+    //  chdir("..");
 }
 char log_file_global[100];
 
@@ -263,43 +263,49 @@ int main()
 
     int sd; // socket descriptor
 
+    // create the socket
     if ((sd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         perror("socket() error");
         exit(-1);
     }
-    
+
+    // set the socket options
     setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
     bzero(&server, sizeof(server));
     bzero(&client, sizeof(client));
 
+    // configure the server
     server.sin_port = htons(port);
-    server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = htonl(INADDR_ANY); // use any adress 0.0.0.0
+    server.sin_family = AF_INET;                // intra net protocol
 
+    // bind the socket to the server
     if (bind(sd, (struct sockaddr *)&server, sizeof(struct sockaddr)) == -1)
     {
         perror("bind() error");
     }
 
+    // listen to the socket
     if (listen(sd, 1) == -1)
     {
         perror("listen() error");
     }
 
+    // initialize the file descriptor set
     FD_ZERO(&all_fds);
     FD_SET(sd, &all_fds);
     int max_sd = sd; // maximum number of clients that can be connected
     tv.tv_sec = 1;
     tv.tv_usec = 0;
 
-    // iterative mode
     int client_fd;
 
     // create the files folder
     int res = mkdir(file_folder, 0777);
 
+    // create the folders for the files and the logs
     if (res == -1 && strstr(strerror(errno), "File exists") != NULL)
     {
         printf("[DEBUG] the folder %s already exists\n", file_folder);
@@ -346,9 +352,10 @@ int main()
         // copy all the sockets to readfds
 
         bcopy(&all_fds, &readfds, sizeof(all_fds));
+        // select the active fds
         int activity = select(max_sd + 1, &readfds, NULL, NULL, &tv);
 
-        if ((activity  < 0) )
+        if ((activity < 0))
         {
 
             printf("Waiting for clients to connect...\n");
@@ -356,8 +363,8 @@ int main()
 
         // fflush(stdout);
         // printf("the client with fd %d wants to conn\n", activity);
-        //  if anyone wants too connect
 
+        //  if anyone wants too connect
         if (FD_ISSET(sd, &readfds))
         {
             // prepare connect for client
@@ -398,7 +405,7 @@ int main()
             if (max_sd < client_fd)
                 max_sd = client_fd;
         }
-        
+
         // check for any activity from other clients
         for (int curr_fd = 0; curr_fd <= max_sd; curr_fd++)
         {
@@ -410,14 +417,13 @@ int main()
                 // handle the client activity
                 // maybe threads ?? or fork
 
-                
                 // extract the client from the table
                 struct client *curr_client = get_client_by_fd(curr_fd);
 
                 // print_client_info(curr_client);
                 if (curr_client == NULL)
                 {
-                    //perror("client not found");
+                    // perror("client not found");
                     continue;
                 }
 
@@ -442,7 +448,7 @@ int main()
                 int msg_len;
                 if (strlen(raw_msg) != 0)
                 {
-                    msg_len = decode_messaje(raw_msg, msg);
+                    msg_len = decode_messaje(raw_msg, msg); // decode the message and return the length of the decoded message
                 }
                 else
                 {
@@ -464,7 +470,7 @@ int main()
 
                 // handle the client's command to the server
                 // printf("message is %s\n", msg);
-                
+
                 if (strlen(msg) == 0 && curr_client->isWriting == true)
                 {
                     printf("[DEBUG] the message is empty\n");
@@ -517,7 +523,7 @@ int main()
                     sprintf(event, "client with fd %d disconnected\n", curr_fd);
                     log_event(event, log_file_name);
 
-                    //fclose(curr_fd);
+                    // fclose(curr_fd);
                     continue;
                 }
                 compare_it(msg, "login", "/l")
@@ -542,7 +548,6 @@ int main()
                         {
                             perror("respond to client error");
                         }
-                       
                     }
 
                     else
@@ -577,7 +582,7 @@ int main()
                     char response[1024];
                     bzero(response, 1024);
                     strcat(response, "Commands:\n");
-                    strcat(response,"\n");
+                    strcat(response, "\n");
                     strcat(response, "create file <file_name> / crf <file_name>  - create a file\n");
                     strcat(response, "peek <file_name> - peek at a file without opening it \n");
                     strcat(response, "open <file_name> - open a file\n");
@@ -789,7 +794,8 @@ int main()
                             }
                         }
 
-                        if(found == true){
+                        if (found == true)
+                        {
                             continue;
                         }
 
@@ -798,6 +804,23 @@ int main()
                         // delete the file specified
                         if (remove(file_name) == 0)
                         {
+
+                            // remove from the table
+                            //  struct file_stat *curr_file = get_file_by_name(file_name);
+                            //  curr_file->file_name[0] = '\0';
+                            //  curr_file->peers_conn = 0;
+                            //  curr_file->pointer_pos = 0;
+
+                            for (int i = 0; i < file_struct_indx; i++)
+                            {
+                                if (strcmp(file_table[i].file_name, file_name) == 0)
+                                {
+                                    file_table[i].file_name[0] = '\0';
+                                    file_table[i].peers_conn = 0;
+                                    file_table[i].pointer_pos = 0;
+                                    // printf("the file name is %s\n", file_table[i].file_name);
+                                }
+                            }
                             printf("File %s deleted successfully\n", file_name);
                             char message[SMALL_SIZE];
                             bzero(message, SMALL_SIZE);
@@ -909,7 +932,7 @@ int main()
 
                         // fwrite(file_content, 1, strlen(file_content), fp);
                     }
-            
+
                     else compare_it(msg, "get-pos", "/get-pos")
                     {
                         if (curr_client->isWriting == false)
@@ -946,7 +969,7 @@ int main()
                             perror("respond to client error");
                         }
                     }
-   
+
                     else compare_it(msg, "whoami", "who")
                     {
 
@@ -971,7 +994,7 @@ int main()
                             perror("respond to client error");
                         }
                     }
-     
+
                     else compare_it(msg, "!close", "/close")
                     {
 
@@ -985,9 +1008,9 @@ int main()
 
                             bzero(file_name, SMALL_SIZE);
 
-                            strcpy(file_name, get_client_by_fd(curr_fd)->file_name);
+                            strcpy(file_name, curr_client->file_name);
 
-                            printf("[DEBUG] the file name is %s\n", file_name);
+                            printf("[DEBUG] the file name is %s\n", curr_client->file_name);
                             struct file_stat *curr_file = get_file_by_name(file_name);
 
                             // print_client_info(get_client_by_fd(curr_fd));
@@ -1030,7 +1053,7 @@ int main()
                             }
                         }
                     }
- 
+
                     else compare_it(msg, "edit", "open")
                     {
                         // printf("the message is %s\n", msg);
@@ -1064,11 +1087,10 @@ int main()
                         // get the name of the file to open
 
                         strcpy(file_name, msg + 5);
-                       
-                        
+
                         strcat(file_name, ".txt");
 
-                        printf("client wants to open %s with len %d \n", file_name,strlen(file_name));
+                        printf("client wants to open %s with len %d \n", file_name, strlen(file_name));
 
                         chdir(file_folder);
 
@@ -1079,7 +1101,7 @@ int main()
                         {
 
                             // search the file in the table and mark it
-                            if (strcmp(file_table[i].file_name, file_name) ==0) // if the name is present
+                            if (strcmp(file_table[i].file_name, file_name) == 0) // if the name is present
                             {
 
                                 // mark in the table
@@ -1109,7 +1131,7 @@ int main()
                             }
                         }
                         print_files();
-                       // printf("opened ok is %d\n", opened_ok);
+                        // printf("opened ok is %d\n", opened_ok);
 
                         // if the file is found on the server
                         if (opened_ok)
@@ -1313,7 +1335,11 @@ int main()
                         // the file the user is currently writing to
 
                         struct file_stat *curr_file = get_file_by_name(curr_client->file_name);
-
+                        printf("[DEBUG] the file name is %s \n", curr_client->file_name);
+                        char file_name[SMALL_SIZE];
+                        bzero(file_name, SMALL_SIZE);
+                        strcpy(file_name, curr_client->file_name);
+                        //printf("the file name is %s \n", file_name);
                         // get the position value
                         char pos[SMALL_SIZE];
                         bzero(pos, SMALL_SIZE);
@@ -1323,7 +1349,9 @@ int main()
 
                         int pos_val = atoi(pos);
 
-                        if (pos_val + curr_file->pointer_pos > curr_file->file_size)
+                        int term1 =pos_val + curr_file->pointer_pos;
+                        int term2  = curr_file->file_size; 
+                        if (term1 > term2)
                         {
                             if (respond_to_client(curr_fd, "You cannot seek to a position greater than the file size\n") < 0)
                             {
@@ -1331,13 +1359,16 @@ int main()
                             }
                             continue;
                         }
+                        
 
                         printf("[DEBUG] the position value is %d \n", pos_val);
 
                         // open the file in append mode
                         FILE *fp;
-                        chdir(file_folder);
-
+                        int res = chdir(file_folder);
+                        //printf("res is %d \n", res);
+                        //printf("the current folder is %s \n", getcwd(NULL, 0));
+                        
                         fp = fopen(curr_client->file_name, "a");
 
                         // seek left in file
@@ -1393,7 +1424,8 @@ int main()
                         strcat(event, "\n");
                         log_event(event, log_file_name);
                         fclose(fp);
-                        chdir("..");
+                        // /chdir("..");
+                        strcpy(curr_client->file_name, file_name);
                     }
 
                     else compare_it(msg, "seekl", "/skl")
@@ -1464,7 +1496,8 @@ int main()
                         char buffer[BIG_SIZE];
                         bzero(buffer, BIG_SIZE);
                         fread(buffer, 1, BIG_SIZE, fp);
-                        printf("file after seek is %s \n", buffer);
+                       // printf("[DEBUG] file after seek is %s \n", buffer);
+                        //printf("file name is %s \n", curr_client->file_name);
                         // chdir("..");
                     }
 
@@ -1583,7 +1616,12 @@ int main()
                             continue;
                         }
 
+                        // print_client_info(curr_client);
+                        // print_files();
                         struct file_stat *curr_file = get_file_by_name(curr_client->file_name);
+
+                        printf("curr file name is %s\n", curr_file->file_name);
+
                         if (curr_file == NULL)
                         {
                             if (respond_to_client(curr_fd, "File not found") < 0)
@@ -1597,34 +1635,87 @@ int main()
                         char value[SMALL_SIZE];
                         bzero(value, SMALL_SIZE);
                         strcat(value, msg + strlen("backspace "));
-                        // printf("the value is %s\n",value);
                         int val = atoi(value);
+                        printf("the value is %d\n", val);
+
                         printf("[DEBUG] the value is %d\n", val);
-                        if (curr_file->pointer_pos - val < 0)
+                        // int operation = val - 1;
+                        // printf("[DEBUG] the operation is %d\n", operation);
+
+                        // curr_file->pointer_pos -= val;
+                        //  /print_files();
+                        int pos = curr_file->pointer_pos - val;
+
+                        printf("%d\n", pos);
+                        if (pos < 0)
                         {
+                            // printf("can't backspace more than the beggining of file\n");
                             if (respond_to_client(curr_fd, "Can't backspace more than the beggining of file") < 0)
                             {
                                 perror("respond to client error");
                             }
                             continue;
                         }
-                        // delete value chars from current position from file
+
+                        // 121212121212112121 --> backspace 10
+                        //  delete value chars from current position from file
                         FILE *fp;
                         chdir(file_folder);
                         fp = fopen(curr_file->file_name, "r+");
-                        fseek(fp, curr_file->pointer_pos, SEEK_SET);
-                        int i;
-                        for (i = 0; i < val; i++)
-                        {
-                            fputc(' ', fp);
-                        }
 
+                        // go to the beggining of the file
+                        fseek(fp, 0, SEEK_SET);
+                        char buffer[BIG_SIZE];
+                        bzero(buffer, BIG_SIZE);
+                        // read until the pointer position
+                        fread(buffer, curr_file->pointer_pos - val, 1, fp);
+
+                        printf("the buffer is %s\n", buffer);
+
+                        // open a temp file to store
+                        FILE *temp;
+
+                        temp = fopen("temp.txt", "a+");
+                        if (temp < 0)
+                        {
+                            perror("error at opening\n ");
+                        }
+                        // write the buffer to the temp file
+                        fwrite(buffer, curr_file->pointer_pos - val, 1, temp);
+
+                        // seek into fp n chars
+
+                        fseek(fp, val, SEEK_CUR);
+                        // printf("the pointer position is %d\n",ftell(fp));
+                        // //read the rest of the file
+                        bzero(buffer, BIG_SIZE);
+                        fread(buffer, curr_file->file_size - ftell(fp), 1, fp);
+                        // printf("the second buffer is %s\n", buffer);
+
+                        // //write the rest of the file to the temp file
+                        fwrite(buffer, strlen(buffer), 1, temp);
+                        // //close the files
                         fclose(fp);
-                        // chdir("..");
+                        fclose(temp);
+                        // rename the temp file to the original file
+                        rename("temp.txt", curr_file->file_name);
+                        curr_file->pointer_pos -= val;
+                        curr_file->file_size -= val;
+                        char file_name[SMALL_SIZE];
+                        strcpy(file_name, curr_file->file_name);
+                        // fseek(fp, curr_file->pointer_pos, SEEK_SET);
+                        //  int i;
+                        //  for (i = 0; i < val; i++)
+                        //  {
+                        //      fputc(' ', fp);
+                        //  }
+
+                        // fclose(fp);
+                        // // chdir("..");
 
                         // update the pointer position
-                        curr_file->pointer_pos -= val;
-                        printf("the pointer position is %d\n", curr_file->pointer_pos);
+                        // curr_file->pointer_pos -= val;
+                        // printf("the pointer position is %d\n", curr_file->pointer_pos);
 
                         // send the new file content to client
                         char response[BIG_SIZE];
@@ -1650,7 +1741,12 @@ int main()
                         bzero(event, SMALL_SIZE);
                         strcat(event, "backspace ");
                         strcat(event, value);
+                        strcat(event, "\n");
                         log_event(event, log_file_name);
+                        // continue;
+                        strcpy(curr_client->file_name, file_name);
+                        // printf("the file name after backspace is %s\n", curr_client->file_name);
+                        //printf("the file name after backspace is %s\n", curr_client->file_name);
                     }
                     // if the user is writing to a file just append to it and the dispplay it
                     else if (curr_client->isWriting || curr_client->isWriting && strcmp(msg, "newline") == 0)
